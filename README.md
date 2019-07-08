@@ -1,2 +1,2 @@
-# adecar
+# AdeCar
 Adenoma - Carcinoma project
