@@ -1,0 +1,33 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r}
+#library(devtools); install_github("im3sanger/dndscv")
+library(dndscv)
+
+```
+
+
+```{r}
+dndsdir = "07_WORKDIR/dndscv/"
+
+patients = c("AC33", "AC34")
+
+for(patient in patients){
+  adenomaFile = paste(dndsdir,patient, "_Adenoma.dndscv" , sep = "")
+  adenoma = read.table(adenomaFile, header = FALSE, stringsAsFactors = FALSE) 
+  colnames(adenoma) = c("sampleID", "chr", "pos", "ref", "mut")
+ 
+  carcinomaFile = paste(dndsdir,patient, "_Carcinoma.dndscv" , sep = "")
+  carcinoma = read.table(carcinomaFile, header = FALSE, stringsAsFactors = FALSE) 
+  colnames(carcinoma) = c("sampleID", "chr", "pos", "ref", "mut") 
+  
+  adenomaOutput = dndscv(adenoma)
+  carcinomaOutput = dndscv(carcinoma)
+
+}
+```
+
