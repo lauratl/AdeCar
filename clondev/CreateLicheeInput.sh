@@ -20,8 +20,9 @@ tumors="adenoma carcinoma"
 # Filter PASS variants
 
  
-f=AC34a_WES_normalFitlered.vcf
+orisamples="${PATIENT}a_WES_normalFitlered.vcf ${PATIENT}b_WES_normalFitlered.vcf"
 
+for f in $orisamples; do
 awk '
 {split($0,linea,"");
 if(linea[1]=="#"){
@@ -30,6 +31,7 @@ else{if($7=="PASS"){
 	print $0}}}
 ' ${ORIDIR}/variants_wes/$f > ${WORKDIR}/${f/.vcf/.PASS.vcf}
 
+done
 
 # Rename samples in the VCF header
 
@@ -100,8 +102,8 @@ vcftools \
 	--exclude-bed ${WORKDIR}/${PATIENT}_carcinoma.cn.bed \
 	--out ${WORKDIR}/${PATIENT}.diploid \
 	--recode
-rm ${WORKDIR}/${PATIENT}.tmp
-mv ${PATIENT}.diploid.recode.vcf ${PATIENT}.diploid.vcf
+rm ${WORKDIR}/${PATIENT}.tmp.recode.vcf
+mv ${WORKDIR}/${PATIENT}.diploid.recode.vcf ${WORKDIR}/${PATIENT}.diploid.vcf
 
 
 # Remove indels
@@ -147,6 +149,8 @@ grep -v '^@' ${WORKDIR}/${PATIENT}_${TUMOR}.allelicCounts.tsv | sed "s/COUNT/COU
 
 done
 
+join ${WORKDIR}/${PATIENT}_adenoma.Counts.tsv ${WORKDIR}/${PATIENT}_carcinoma.Counts.tsv > ${WORKDIR}/${PATIENT}.Counts 
+
 # Convert to LICHeE input format
 
 awk -F " " '
@@ -164,5 +168,5 @@ else{alt=$5}
 split($1,a,":");
 print a[1]"\t"a[2]"\t"$4"/"$5"\t0.0\t"$3/($2+$3)"\t"$7/($6+$7)
 
-}' ${WORKDIR}/${PATIENT}.counts > ${WORKDIR}/${PATIENT}.LicheeInput
+}' ${WORKDIR}/${PATIENT}.Counts > ${WORKDIR}/${PATIENT}.LicheeInput
 

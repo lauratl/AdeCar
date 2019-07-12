@@ -15,8 +15,9 @@ SAMPLELIST=${ORIDIR}/${SAMPLELIST}
 
 PATIENTS=`cut -f2 ${SAMPLELIST} | sort | uniq | awk '{printf $0" "}'`
 PATIENTS="AC1"
-
-
+PATIENTS="AC1 AC13 AC14 AC30 AC35 AC6"
+#PATIENTS="AC30"
+PATIENTS="AC30 AC35 AC6"
 # Run the rest of the script for each patient 
 
 for PATIENT in $PATIENTS; do
@@ -155,9 +156,19 @@ rm ${WORKDIR}/${PATIENT}.tmp.*.Counts
 HEADER=`echo "$SAMPLES" | sed 's/ /\t/g'  | awk -v samples="$SAMPLES" '{print "#chr\tposition\tdescription\tNormal\t"samples}'`
 
 awk -v mindepth=20 -v samples="$SAMPLES" -v header="${HEADER}" -v nsamples=${#SAMPLESARRAY[@]} -F " " '
-BEGIN{print header}
+BEGIN{
+split(samples,samplearray," ")
+printf "#chr\tposition\tdescription\tNormal"
+for (sample in samplearray){
+printf "\t"samplearray[sample]
+}
+print ""
+}
 {if(NR==1){next}
 
+
+
+split("",noN)
 split(samples,samplearray," ")
 
 k=5
@@ -171,6 +182,7 @@ k=k+4
 
 
 firstnuc=noN[5]
+
 for (altnuc in noN){
 
 
