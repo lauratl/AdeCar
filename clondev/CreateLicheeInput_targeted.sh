@@ -5,6 +5,9 @@ source ReadConfig.sh $1
 
 WORKDIR=${WORKDIR}/targeted/clondev/prepare_lichee_input/
 SAMPLELIST=${ORIDIR}/${SAMPLELIST}
+CONTROL=${ORIDIR}/${CONTROL}
+LOG=${WORKDIR}/CreateLicheeInput_Targeted.log
+TABLE=${WORKDIR}/CreateLicheeInput_Targeted.table
 
 #ORIDIR=$1
 #WORKDIR=$2
@@ -14,19 +17,33 @@ SAMPLELIST=${ORIDIR}/${SAMPLELIST}
 # Get the list of patients
 
 PATIENTS=`cut -f2 ${SAMPLELIST} | sort | uniq | awk '{printf $0" "}'`
-PATIENTS="AC1"
-PATIENTS="AC1 AC13 AC14 AC30 AC35 AC6"
+#PATIENTS="AC1"
+#PATIENTS="AC1 AC13 AC14 AC30 AC35 AC6"
 #PATIENTS="AC30"
-PATIENTS="AC30 AC35 AC6"
+#PATIENTS="AC30 AC35 AC6"
 # Run the rest of the script for each patient 
 
+echo "Starting Lichee input creation" > $LOG
+echo "#patient;healthy;initial_variants;non-diploid-genes;diploidvariants;snvs;retrieved;enoughdepth;somatic;final" > $TABLE
+
+
 for PATIENT in $PATIENTS; do
+
+echo "Processing patient $PATIENT" >> $LOG
 
 # Combine all samples from the patient
 
 ## Get only healthy samples by removing those that are AC<patient_number>c or AC<patient_number>d
 
-SAMPLES=`awk -v patient=$PATIENT '{if($2==patient){print $0}}' ${SAMPLELIST} | grep -v "[0-9]c" | grep -v "[0-9]d" | awk '{printf $1" "}'`
+#SAMPLES=`awk -v patient=$PATIENT '{if($2==patient){print $0}}' ${SAMPLELIST} | grep -v "[0-9]c" | grep -v "[0-9]d" | awk '{printf $1" "}'`
+
+## Get also healthy sample if available (to remove the germline variants)
+
+SAMPLES=`awk -v patient=$PATIENT '{if($2==patient){printf $1" "}}' ${SAMPLELIST}`
+HEALTHY=`awk -v patient=$PATIENT '{if($2==patient){print $1}}' ${CONTROL}`
+
+echo "Samples are $SAMPLES" >> $LOG
+echo "Healthy sample is $HEALTHY" >>$LOG
 
 ## Combine vcfs
 
@@ -43,6 +60,9 @@ java -jar $EBROOTGATK/GenomeAnalysisTK.jar -T CombineVariants \
 	--genotypemergeoption PRIORITIZE \
 	--rod_priority_list $ROD_PRIORITY_LIST
 
+
+INITIAL=$(grep -v '^#' ${WORKDIR}/${PATIENT}.combined.vcf | wc -l)
+echo "Initial variants: $INITIAL" >> $LOG
 
 # Create bed with the non-diploid copy number regions
 
@@ -64,6 +84,7 @@ for GENE in $GENES; do
 grep $GENE ${ORIDIR}/cn_targeted/design.bed | cut -f1,2,3  >> $CNFILE
 done
 
+echo "Genes with non-diploid copy number: $GENES" >>  $LOG
 
 
 # Remove variants in non-diploid regions
@@ -79,6 +100,8 @@ vcftools \
 
 mv ${WORKDIR}/${PATIENT}.diploid.recode.vcf ${WORKDIR}/${PATIENT}.diploid.vcf
 
+DIPLOID=$(grep -v '^#' ${WORKDIR}/${PATIENT}.diploid.vcf | wc -l)
+echo "Diploid variants: $DIPLOID" >> $LOG
 
 # Remove indels
 
@@ -92,6 +115,8 @@ else{
 		print $0}}}
 ' ${WORKDIR}/${PATIENT}.diploid.vcf > ${WORKDIR}/${PATIENT}.diploid.snvs.vcf
 
+SNVS=$(grep -v '^#' ${WORKDIR}/${PATIENT}.diploid.snvs.vcf | wc -l)
+echo "Diploid SNVs: $SNVS" >> $LOG
 
 # Get list of positions to recover read counts
 
@@ -106,7 +131,7 @@ module load gatk/4.1.1.0
 
 for SAMPLE in $SAMPLES; do
 
-BAMFILE=`find $ORIDIR/bams_targeted -name "*bam" | grep -e "$SAMPLE[_|.]"`
+BAMFILE=`find $ORIDIR/bams_targeted_new -name "*bam" | grep -e "$SAMPLE[_|.]"`
 
 
 ## Get read counts from the bam
@@ -149,6 +174,10 @@ done
 
 mv ${WORKDIR}/${PATIENT}.tmp.${PREVSAMPLE}.Counts ${WORKDIR}/${PATIENT}.Counts
 rm ${WORKDIR}/${PATIENT}.tmp.*.Counts
+
+
+RETRIEVED=$(grep -v '^CONTIG' ${WORKDIR}/${PATIENT}.Counts | wc -l)
+echo "Retrieved read counts from  $RETRIEVED variants" >> $LOG
 
 
 # Convert to LICHeE input format
@@ -213,8 +242,58 @@ i=i+4
 
 print ""
 
-}' ${WORKDIR}/${PATIENT}.Counts > ${WORKDIR}/${PATIENT}.LicheeInput
+}' ${WORKDIR}/${PATIENT}.Counts > ${WORKDIR}/${PATIENT}.All
+
+ENOUGH=$(grep -v '^#' ${WORKDIR}/${PATIENT}.All | wc -l)
+echo "Kept $ENOUGH variants with enough depth" >> $LOG
+
+# Filter out germline variants
+
+awk -v healthy=$HEALTHY 'BEGIN{healthy_idx=0}{
+if(NR==1){
+for(i=5;i<=NF;i++){
+
+if($i==healthy){healthy_idx=i}
+}
+if(healthy_idx==0){print $0}
+else{printf $1"\t"$2"\t"$3"\t"$healthy_idx;
+for(i=5;i<=NF;i++){
+if(i!=healthy_idx){printf "\t"$i}
+}
+print ""
+}
+}
+else{
+if(healthy_idx==0){print $0
+}else{
+if($healthy_idx<0.2){
+printf $1"\t"$2"\t"$3"\t"$healthy_idx;
+for(i=5;i<=NF;i++){
+if(i!=healthy_idx){printf "\t"$i}
+}
+print ""
+}
+
+
+}
+}}' ${WORKDIR}/${PATIENT}.All > ${WORKDIR}/${PATIENT}.Somatic
+
+SOMATIC=$(grep -v '^#' ${WORKDIR}/${PATIENT}.Somatic | wc -l)
+echo "Kept $SOMATIC somatic SNVs" >> $LOG
 
 
 
+
+awk '{
+if($1=="chr19" && $2=="15285135"){next}
+if($1=="chr21" && $2=="326385"){next}
+if($1=="chr8" && $2=="13356818"){next}
+print $0
+}
+' ${WORKDIR}/${PATIENT}.Somatic > ${WORKDIR}/${PATIENT}.LicheeInput
+
+FINAL=$(grep -v '^#' ${WORKDIR}/${PATIENT}.LicheeInput | wc -l)
+echo "Finally kept $FINAL SNVs" >> $LOG
+
+echo "$PATIENT;$HEALTHY;$INITIAL;$GENES;$DIPLOID;$SNVS;$RETRIEVED;$ENOUGH;$SOMATIC;$FINAL" >> $TABLE
 done
