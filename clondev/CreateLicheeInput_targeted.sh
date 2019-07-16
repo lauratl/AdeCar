@@ -210,7 +210,11 @@ k=k+4
 
 
 
-firstnuc=noN[5]
+
+for (altnuc in noN){
+firstnuc=noN[altnuc]
+break
+}
 
 for (altnuc in noN){
 
