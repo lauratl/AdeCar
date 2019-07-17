@@ -123,9 +123,34 @@ else{
 SNVS=$(grep -v '^#' ${WORKDIR}/${PATIENT}.diploid.snvs.vcf | wc -l)
 echo "Diploid SNVs: $SNVS" >> $LOG
 
+
+# If no healthy sample, remove variants from dbSNP
+
+if [ "$HEALTHY" == "" ]; then 
+
+module load gatk/4.1.1.0
+
+gatk SelectVariants \
+	-V ${WORKDIR}/${PATIENT}.diploid.snvs.vcf \
+	--discordance ${RESDIR}/dbsnp_138.hg19.vcf.gz \
+	-R ${RESDIR}/hg19.fasta \
+	-O ${WORKDIR}/${PATIENT}.diploid.snvs.nodbsnp.vcf
+
+NEXTINPUT=${WORKDIR}/${PATIENT}.diploid.snvs.nodbsnp.vcf
+
+else
+
+NEXTINPUT=${WORKDIR}/${PATIENT}.diploid.snvs.vcf
+
+fi
+
+
+
+
+
 # Get list of positions to recover read counts
 
-grep -v '^#' ${WORKDIR}/${PATIENT}.diploid.snvs.vcf | awk '{print $1"\t"$2-1"\t"$2}' > ${WORKDIR}/${PATIENT}.pos.bed
+grep -v '^#' ${NEXTINPUT} | awk '{print $1"\t"$2-1"\t"$2}' > ${WORKDIR}/${PATIENT}.pos.bed
 
 
 # Recover read counts
