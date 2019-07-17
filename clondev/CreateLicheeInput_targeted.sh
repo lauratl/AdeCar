@@ -19,7 +19,7 @@ TABLE=${WORKDIR}/CreateLicheeInput_Targeted.table
 PATIENTS=`cut -f2 ${SAMPLELIST} | sort | uniq | awk '{printf $0" "}'`
 #PATIENTS="AC1"
 #PATIENTS="AC1 AC13 AC14 AC30 AC35 AC6"
-#PATIENTS="AC30"
+PATIENTS="AC30"
 #PATIENTS="AC30 AC35 AC6"
 # Run the rest of the script for each patient 
 
@@ -112,7 +112,12 @@ if(a[1]=="#"){
 	print $0}
 else{
 	if(length($4)==1 && length($5)==1){
-		print $0}}}
+		print $0}
+	else{
+		split($5,b,",")
+		for(alt in b){if(length(b[alt])!=1){next}}
+		print $0
+}}}
 ' ${WORKDIR}/${PATIENT}.diploid.vcf > ${WORKDIR}/${PATIENT}.diploid.snvs.vcf
 
 SNVS=$(grep -v '^#' ${WORKDIR}/${PATIENT}.diploid.snvs.vcf | wc -l)
@@ -184,26 +189,30 @@ echo "Retrieved read counts from  $RETRIEVED variants" >> $LOG
 
 HEADER=`echo "$SAMPLES" | sed 's/ /\t/g'  | awk -v samples="$SAMPLES" '{print "#chr\tposition\tdescription\tNormal\t"samples}'`
 
-awk -v mindepth=20 -v samples="$SAMPLES" -v header="${HEADER}" -v nsamples=${#SAMPLESARRAY[@]} -F " " '
-BEGIN{
-split(samples,samplearray," ")
+awk -v mindepth=20 -v minvaf=0.05 -v samples="$SAMPLES" -v header="${HEADER}" -v nsamples=${#SAMPLESARRAY[@]} -F " " '
+{if(NR==1){
+samplestring=""
+for(i=2;i<=NF;i=i+4){
+split($i,rc,"_")
+samplestring=samplestring+"."+rc[3]"_"rc[4]"_"rc[5]
+}
+print samplestring"***"
+split(samplestring,samplearray,".")
+
 printf "#chr\tposition\tdescription\tNormal"
 for (sample in samplearray){
 printf "\t"samplearray[sample]
 }
 print ""
+print length(samplearray)
 }
-{if(NR==1){next}
-
-
 
 split("",noN)
-split(samples,samplearray," ")
 
 k=5
 
 for (sample in samplearray){
-
+#print sample
 if($k!="N"){noN[k]=$k}
 k=k+4
 }
@@ -216,13 +225,38 @@ firstnuc=noN[altnuc]
 break
 }
 
+# Decide wether there are more than one alternative allele
+
+flag=0
 for (altnuc in noN){
-
-
-if(firstnuc!=noN[altnuc]){next}
+if(firstnuc!=noN[altnuc]){
+flag=1; uno =firstnuc; dos =noN[altnuc]
+}
 }
 
+# If more than one alternative, check if one is 5-fold the other
 
+if(flag==1){
+unocount=0
+doscount=0
+
+for(j=5;j<=NF;j=j+4){
+if($j==uno){unocount+=$(j-2)}
+else{doscount+=$(j-2)}
+}
+if(unocount>doscount){major=uno;minor=dos;if((doscount/unocount)>0.2){next}}
+else{major=dos;minor=uno;if((unocount/doscount)>0.2){next}
+}
+
+# If keep the major, set the minor read counts to 0
+
+
+for(j=5;j<=NF;j=j+4){
+if($j==minor){$(j-2)=0; $j="N"}
+}
+
+print "*********"$0
+}
 
 
 i=2
@@ -231,6 +265,16 @@ j=i+1
 if(($i+$j) < 20){next}
 i=i+4
 }
+
+flag=0
+i=2
+for (sample in samplearray){
+j=i+1
+
+if($j/($i+$j) >=minvaf){flag=1}
+i=i+4
+}
+if(flag==0){next}
 
 split($1,a,":");
 printf a[1]"\t"a[2]"\t"$4"/"firstnuc"\t0.0"
@@ -264,6 +308,8 @@ else{printf $1"\t"$2"\t"$3"\t"$healthy_idx;
 for(i=5;i<=NF;i++){
 if(i!=healthy_idx){printf "\t"$i}
 }
+print healthy_idx "is healthy_idx"
+print healthy " is healthy"
 print ""
 }
 }
