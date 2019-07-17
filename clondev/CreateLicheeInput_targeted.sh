@@ -9,18 +9,14 @@ CONTROL=${ORIDIR}/${CONTROL}
 LOG=${WORKDIR}/CreateLicheeInput_Targeted.log
 TABLE=${WORKDIR}/CreateLicheeInput_Targeted.table
 
-#ORIDIR=$1
-#WORKDIR=$2
-#PATIENT=$3
 
 
 # Get the list of patients
 
 PATIENTS=`cut -f2 ${SAMPLELIST} | sort | uniq | awk '{printf $0" "}'`
-#PATIENTS="AC1"
-#PATIENTS="AC1 AC13 AC14 AC30 AC35 AC6"
-PATIENTS="AC30"
-#PATIENTS="AC30 AC35 AC6"
+
+
+
 # Run the rest of the script for each patient 
 
 echo "Starting Lichee input creation" > $LOG
@@ -31,13 +27,11 @@ for PATIENT in $PATIENTS; do
 
 echo "Processing patient $PATIENT" >> $LOG
 
+
 # Combine all samples from the patient
 
-## Get only healthy samples by removing those that are AC<patient_number>c or AC<patient_number>d
 
-#SAMPLES=`awk -v patient=$PATIENT '{if($2==patient){print $0}}' ${SAMPLELIST} | grep -v "[0-9]c" | grep -v "[0-9]d" | awk '{printf $1" "}'`
-
-## Get also healthy sample if available (to remove the germline variants)
+## Get also healthy sample if available (to remove the germline variants later)
 
 SAMPLES=`awk -v patient=$PATIENT '{if($2==patient){printf $1" "}}' ${SAMPLELIST}`
 HEALTHY=`awk -v patient=$PATIENT '{if($2==patient){print $1}}' ${CONTROL}`
@@ -47,7 +41,7 @@ echo "Healthy sample is $HEALTHY" >>$LOG
 
 ## Combine vcfs
 
-module load gatk/3.7-0-gcfedb67
+module load gatk/3.7-0-gcfedb67 
 
 SAMPLES_TO_COMBINE=`echo $SAMPLES | sed 's/ /\n/g' | awk -v workdir=$ORIDIR/variants_targeted/${PATIENT} '{split("abcdefghijklmnopqrstu",foosamplenames,"");printf "-V:"foosamplenames[NR]" "workdir"/"$1".vcf "}'`
 ROD_PRIORITY_LIST=`echo $SAMPLES | sed 's/ /\n/g' | awk -v workdir=$ORIDIR/variants_targeted/${PATIENT} '{split("abcdefghijklmnopqrstu",foosamplenames,"");printf foosamplenames[NR]","}' | awk -F "" '{for(i=1;i<NF;i++){printf $i}}' `
@@ -64,15 +58,14 @@ java -jar $EBROOTGATK/GenomeAnalysisTK.jar -T CombineVariants \
 INITIAL=$(grep -v '^#' ${WORKDIR}/${PATIENT}.combined.vcf | wc -l)
 echo "Initial variants: $INITIAL" >> $LOG
 
-# Create bed with the non-diploid copy number regions
 
+# Remove variants in non-diploid regions
 
 ## Extract non-diploid genes for that patient
 
 GENES=`grep ";$PATIENT;" ${ORIDIR}/cn_targeted/targeted_cn.csv | cut -d ";" -f1 | awk '{printf $1" "}'` 
 
-
-## Create bed file from the genes
+## Create bed file of the non-diploid regions from the genes
 
 CNFILE=${WORKDIR}/${PATIENT}.cn.bed
 
@@ -87,7 +80,7 @@ done
 echo "Genes with non-diploid copy number: $GENES" >>  $LOG
 
 
-# Remove variants in non-diploid regions
+## Remove variants in non-diploid regions from the vcf
 
 module load gcc/6.4.0 vcftools/0.1.15
 
@@ -103,6 +96,7 @@ mv ${WORKDIR}/${PATIENT}.diploid.recode.vcf ${WORKDIR}/${PATIENT}.diploid.vcf
 DIPLOID=$(grep -v '^#' ${WORKDIR}/${PATIENT}.diploid.vcf | wc -l)
 echo "Diploid variants: $DIPLOID" >> $LOG
 
+
 # Remove indels
 
 module load gatk/4.1.1.0
@@ -111,14 +105,14 @@ gatk SelectVariants \
         -V ${WORKDIR}/${PATIENT}.diploid.vcf \
         -R ${RESDIR}/hg19.fasta \
          --select-type-to-include SNP \
-        -O ${WORKDIR}/${PATIENT}.diploid.snv.vcf
+        -O ${WORKDIR}/${PATIENT}.diploid.snvs.vcf
 
 
 SNVS=$(grep -v '^#' ${WORKDIR}/${PATIENT}.diploid.snvs.vcf | wc -l)
 echo "Diploid SNVs: $SNVS" >> $LOG
 
 
-# If no healthy sample, remove variants from dbSNP
+# If no healthy sample, remove variants in dbSNP
 
 if [ "$HEALTHY" == "" ]; then 
 
@@ -137,12 +131,13 @@ NEXTINPUT=${WORKDIR}/${PATIENT}.diploid.snvs.vcf
 
 fi
 
-# Get list of positions to recover read counts
+
+# Recover read counts
+
+## Get list of positions to recover read counts
 
 grep -v '^#' ${NEXTINPUT} | awk '{print $1"\t"$2-1"\t"$2}' > ${WORKDIR}/${PATIENT}.pos.bed
 
-
-# Recover read counts
 
 ## Locate the corresponding bam file
 
@@ -155,11 +150,13 @@ BAMFILE=`find $ORIDIR/bams_targeted_new -name "*bam" | grep -e "$SAMPLE[_|.]"`
 
 gatk CollectAllelicCounts \
           -I ${BAMFILE} \
-          -R ${RESDIR}/hg19.fasta \
+          -R ${RESDIR}/Hg19IonTorrentDefault.fa \
           -L ${WORKDIR}/${PATIENT}.pos.bed \
           -O ${WORKDIR}/${PATIENT}.${SAMPLE}.allelicCounts.tsv
 
 done
+
+
 
 # Merge read counts from the different samples
 
@@ -199,160 +196,11 @@ echo "Retrieved read counts from  $RETRIEVED variants" >> $LOG
 
 # Convert to LICHeE input format
 
-HEADER=`echo "$SAMPLES" | sed 's/ /\t/g'  | awk -v samples="$SAMPLES" '{print "#chr\tposition\tdescription\tNormal\t"samples}'`
+module load gcccore/6.4.0 python/2.7.15
 
-awk -v mindepth=20 -v minvaf=0.05 -v samples="$SAMPLES" -v header="${HEADER}" -v nsamples=${#SAMPLESARRAY[@]} -F " " '
-{if(NR==1){
-samplestring=""
-for(i=2;i<=NF;i=i+4){
-split($i,rc,"_")
-samplestring=samplestring+"."+rc[3]"_"rc[4]"_"rc[5]
-}
-print samplestring"***"
-split(samplestring,samplearray,".")
-
-printf "#chr\tposition\tdescription\tNormal"
-for (sample in samplearray){
-printf "\t"samplearray[sample]
-}
-print ""
-print length(samplearray)
-}
-
-split("",noN)
-
-k=5
-
-for (sample in samplearray){
-#print sample
-if($k!="N"){noN[k]=$k}
-k=k+4
-}
+python CreateLicheeInput_targeted.py ${WORKDIR}/${PATIENT}.Counts ${WORKDIR}/${PATIENT}.LicheeInput $HEALTHY
 
 
-
-
-for (altnuc in noN){
-firstnuc=noN[altnuc]
-break
-}
-
-# Decide wether there are more than one alternative allele
-
-flag=0
-for (altnuc in noN){
-if(firstnuc!=noN[altnuc]){
-flag=1; uno =firstnuc; dos =noN[altnuc]
-}
-}
-
-# If more than one alternative, check if one is 5-fold the other
-
-if(flag==1){
-unocount=0
-doscount=0
-
-for(j=5;j<=NF;j=j+4){
-if($j==uno){unocount+=$(j-2)}
-else{doscount+=$(j-2)}
-}
-if(unocount>doscount){major=uno;minor=dos;if((doscount/unocount)>0.2){next}}
-else{major=dos;minor=uno;if((unocount/doscount)>0.2){next}
-}
-
-# If keep the major, set the minor read counts to 0
-
-
-for(j=5;j<=NF;j=j+4){
-if($j==minor){$(j-2)=0; $j="N"}
-}
-
-print "*********"$0
-}
-
-
-i=2
-for (sample in samplearray){
-j=i+1
-if(($i+$j) < 20){next}
-i=i+4
-}
-
-flag=0
-i=2
-for (sample in samplearray){
-j=i+1
-
-if($j/($i+$j) >=minvaf){flag=1}
-i=i+4
-}
-if(flag==0){next}
-
-split($1,a,":");
-printf a[1]"\t"a[2]"\t"$4"/"firstnuc"\t0.0"
-
-
-
-i=2 
-for (sample in samplearray){
-j=i+1
-printf "\t"$j/($i+$j)
-i=i+4
-}
-
-print ""
-
-}' ${WORKDIR}/${PATIENT}.Counts > ${WORKDIR}/${PATIENT}.All
-
-ENOUGH=$(grep -v '^#' ${WORKDIR}/${PATIENT}.All | wc -l)
-echo "Kept $ENOUGH variants with enough depth" >> $LOG
-
-# Filter out germline variants
-
-awk -v healthy=$HEALTHY 'BEGIN{healthy_idx=0}{
-if(NR==1){
-for(i=5;i<=NF;i++){
-
-if($i==healthy){healthy_idx=i}
-}
-if(healthy_idx==0){print $0}
-else{printf $1"\t"$2"\t"$3"\t"$healthy_idx;
-for(i=5;i<=NF;i++){
-if(i!=healthy_idx){printf "\t"$i}
-}
-print healthy_idx "is healthy_idx"
-print healthy " is healthy"
-print ""
-}
-}
-else{
-if(healthy_idx==0){print $0
-}else{
-if($healthy_idx<0.2){
-printf $1"\t"$2"\t"$3"\t"$healthy_idx;
-for(i=5;i<=NF;i++){
-if(i!=healthy_idx){printf "\t"$i}
-}
-print ""
-}
-
-
-}
-}}' ${WORKDIR}/${PATIENT}.All > ${WORKDIR}/${PATIENT}.Somatic
-
-SOMATIC=$(grep -v '^#' ${WORKDIR}/${PATIENT}.Somatic | wc -l)
-echo "Kept $SOMATIC somatic SNVs" >> $LOG
-
-
-
-
-awk '{
-if($1=="chr19" && $2=="15285135"){next}
-if($1=="chr21" && $2=="326385"){next}
-if($1=="chr8" && $2=="13356818"){next}
-print $0
-}
-' ${WORKDIR}/${PATIENT}.Somatic > ${WORKDIR}/${PATIENT}.LicheeInput
 
 FINAL=$(grep -v '^#' ${WORKDIR}/${PATIENT}.LicheeInput | wc -l)
 echo "Finally kept $FINAL SNVs" >> $LOG
