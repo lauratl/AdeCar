@@ -105,20 +105,14 @@ echo "Diploid variants: $DIPLOID" >> $LOG
 
 # Remove indels
 
+module load gatk/4.1.1.0
 
-awk '
-{split($0,a,"");
-if(a[1]=="#"){
-	print $0}
-else{
-	if(length($4)==1 && length($5)==1){
-		print $0}
-	else{
-		split($5,b,",")
-		for(alt in b){if(length(b[alt])!=1){next}}
-		print $0
-}}}
-' ${WORKDIR}/${PATIENT}.diploid.vcf > ${WORKDIR}/${PATIENT}.diploid.snvs.vcf
+gatk SelectVariants \
+        -V ${WORKDIR}/${PATIENT}.diploid.vcf \
+        -R ${RESDIR}/hg19.fasta \
+         --select-type-to-include SNP \
+        -O ${WORKDIR}/${PATIENT}.diploid.snv.vcf
+
 
 SNVS=$(grep -v '^#' ${WORKDIR}/${PATIENT}.diploid.snvs.vcf | wc -l)
 echo "Diploid SNVs: $SNVS" >> $LOG
@@ -128,7 +122,6 @@ echo "Diploid SNVs: $SNVS" >> $LOG
 
 if [ "$HEALTHY" == "" ]; then 
 
-module load gatk/4.1.1.0
 
 gatk SelectVariants \
 	-V ${WORKDIR}/${PATIENT}.diploid.snvs.vcf \
@@ -144,18 +137,12 @@ NEXTINPUT=${WORKDIR}/${PATIENT}.diploid.snvs.vcf
 
 fi
 
-
-
-
-
 # Get list of positions to recover read counts
 
 grep -v '^#' ${NEXTINPUT} | awk '{print $1"\t"$2-1"\t"$2}' > ${WORKDIR}/${PATIENT}.pos.bed
 
 
 # Recover read counts
-
-module load gatk/4.1.1.0
 
 ## Locate the corresponding bam file
 
@@ -168,7 +155,7 @@ BAMFILE=`find $ORIDIR/bams_targeted_new -name "*bam" | grep -e "$SAMPLE[_|.]"`
 
 gatk CollectAllelicCounts \
           -I ${BAMFILE} \
-          -R ${RESDIR}/Hg19IonTorrentDefault.fa \
+          -R ${RESDIR}/hg19.fasta \
           -L ${WORKDIR}/${PATIENT}.pos.bed \
           -O ${WORKDIR}/${PATIENT}.${SAMPLE}.allelicCounts.tsv
 
