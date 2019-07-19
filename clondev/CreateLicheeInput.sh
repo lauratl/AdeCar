@@ -3,7 +3,7 @@
 
 source ReadConfig.sh $1
 PATIENT=$2
-WORKDIR=${WORKDIR}/prepare_clonefinder_input/from_bams
+WORKDIR=${WORKDIR}/wes/clondev/prepare_clonefinder_input/from_bams/with_python
 
 #ORIDIR=$1
 #WORKDIR=$2
