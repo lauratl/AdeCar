@@ -15,7 +15,7 @@ TABLE=${WORKDIR}/CreateLicheeInput_Targeted.table
 
 PATIENTS=`cut -f2 ${SAMPLELIST} | sort | uniq | awk '{printf $0" "}'`
 
-
+PATIENTS="AC1 AC6 AC30"
 
 # Run the rest of the script for each patient 
 
@@ -198,7 +198,7 @@ echo "Retrieved read counts from  $RETRIEVED variants" >> $LOG
 
 module load gcccore/6.4.0 python/2.7.15
 
-python CreateLicheeInput_targeted.py ${WORKDIR}/${PATIENT}.Counts ${WORKDIR}/${PATIENT}.LicheeInput $HEALTHY
+python CreateCDInput_targeted.py ${WORKDIR}/${PATIENT}.Counts ${WORKDIR}/${PATIENT}.LicheeInput ${WORKDIR}/${PATIENT}.CloneFinderInput $HEALTHY
 
 
 

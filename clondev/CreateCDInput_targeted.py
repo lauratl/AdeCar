@@ -1,6 +1,5 @@
 from sys import argv
 
-
 def parseHeader(linea):
     
     samples=[]
@@ -55,6 +54,13 @@ def getPerSampleVaf(mut):
         sampleInfo = muts[mut]['samplesInfo'][sample]
         sampleVafs[sample] = float(sampleInfo['alt_count']) /  (sampleInfo['ref_count'] + sampleInfo['alt_count'])
     return sampleVafs
+
+def getPerSampleReadCounts(mut):
+    sampleReadCounts = {}
+    for sample in muts[mut]['samplesInfo'].keys():
+        sampleInfo = muts[mut]['samplesInfo'][sample]
+        sampleReadCounts[sample] = [sampleInfo['ref_count'], sampleInfo['alt_count']]
+    return sampleReadCounts
 
     
 def filterLowDepth(mut):
@@ -238,8 +244,8 @@ def printLicheeMut(mut):
     refAllele = muts[mut]['samplesInfo'][samples[0]]['ref_nuc']
     altAllele = getAltAlleles(mut)[0]
     
-    
     licheeOutputFile.write( chrom + "\t" + pos + "\t" + refAllele + "/" + altAllele )
+
     
     vafs = getPerSampleVaf(mut)
     
@@ -258,20 +264,62 @@ def printLicheeMut(mut):
    
     licheeOutputFile.write("\n")
     
+def printCloneFinderHeader():
+    
+    cloneFinderOutputFile.write("#SNVID\tWild\tMut")
+    
+    for sample in samples:
+        if sample != healthy:
+            cloneFinderOutputFile.write("\t" + sample + ":ref\t" + sample + ":alt")
+    
+    cloneFinderOutputFile.write("\n")   
+    
+    
+    
+    
+def printCloneFinderMut(mut):
+    chrom = muts[mut]['chr']
+    pos = muts[mut]['pos']
+    refAllele = muts[mut]['samplesInfo'][samples[0]]['ref_nuc']
+    altAllele = getAltAlleles(mut)[0]
+    
+    
+    cloneFinderOutputFile.write( chrom + "_" + pos + "\t" + refAllele + "\t" + altAllele )
+    
+    readCounts = getPerSampleReadCounts(mut)
+        
+        
+    for sample in samples:
+        if sample != healthy:
+            cloneFinderOutputFile.write( "\t"+ str(readCounts[sample][0]) + "\t" + str(readCounts[sample][1]) )
+    
+        
+   
+    cloneFinderOutputFile.write("\n")
+    
     
 
 def printLicheeOutput():
     printLicheeHeader()
     for mut in muts.keys():
         printLicheeMut(mut)
+    
+    
+def printCloneFinderOutput():
+    printCloneFinderHeader()
+    for mut in muts.keys():
+        printCloneFinderMut(mut)
+        
+    
 
 
 
 counts = open(argv[1], 'r')
 licheeOutputFile = open(argv[2], 'w')
+cloneFinderOutputFile = open(argv[3], 'w')
 
-if len(argv) == 4:
-    healthy=argv[3]
+if len(argv) == 5:
+    healthy=argv[4]
 else:
     healthy=""
 
@@ -291,7 +339,8 @@ for linea in counts:
         samples = parseHeader(linea)
     else:
         getMutsInfo(linea)
-
+                              
+                              
 
 for mut in muts.keys():
     
@@ -327,3 +376,9 @@ for mut in muts.keys():
     
 printLicheeOutput()
 licheeOutputFile.close()
+
+printCloneFinderOutput()
+cloneFinderOutputFile.close()
+
+
+
