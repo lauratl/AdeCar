@@ -50,11 +50,13 @@ for linea in lichee:
         
     
 output.write(">healthy\n")
+
 for snv in snvsInfo.keys():
     output.write(snvsInfo[snv][2].split("/")[0])
 output.write("\n")
 
-for clon in snvsInNodes.keys():
+
+for clon in sorted(snvsInNodes.keys()):
     output.write(">clon_"+str(clon)+"\n")
     for snv in snvsInfo.keys():
         if snv in snvsInNodes[clon]:
