@@ -113,7 +113,7 @@ module load gatk/4.1.1.0
 
 gatk SelectVariants \
         -V ${WORKDIR}/${PATIENT}.diploid.vcf \
-        -R ${RESDIR}/hg19.fasta \
+        -R ${RESDIR}/hs37d5.fa \
          --select-type-to-include SNP \
         -O ${WORKDIR}/${PATIENT}.diploid.snvs.vcf
 
