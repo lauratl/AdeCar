@@ -19,7 +19,7 @@ tumors="adenoma carcinoma"
 
 # Filter PASS variants
 
- 
+
 orisamples="${PATIENT}a_WES_normalFitlered.vcf ${PATIENT}b_WES_normalFitlered.vcf"
 
 for f in $orisamples; do
@@ -40,7 +40,7 @@ module load gcc/6.4.0 bcftools/1.9
 bcftools reheader \
 	--samples <(printf "%s\n%s\n" ${PATIENT}_healthy ${PATIENT}_adenoma) \
 	--output ${WORKDIR}/${PATIENT}_adenoma.malformed.vcf \
-	${WORKDIR}/${PATIENT}b_WES_normalFitlered.PASS.vcf 
+	${WORKDIR}/${PATIENT}b_WES_normalFitlered.PASS.vcf
 
 bcftools reheader \
 	--samples <(printf "%s\n%s\n" ${PATIENT}_healthy ${PATIENT}_carcinoma) \
@@ -92,31 +92,31 @@ module load gcc/6.4.0 vcftools/0.1.15
 
 
 vcftools \
-    	--vcf ${WORKDIR}/${PATIENT}.missingreadcounts.vcf \
+  --vcf ${WORKDIR}/${PATIENT}.missingreadcounts.vcf \
 	--exclude-bed ${WORKDIR}/${PATIENT}_adenoma.cn.bed \
 	--out ${WORKDIR}/${PATIENT}.tmp \
 	--recode
 
 vcftools \
-    	--vcf ${WORKDIR}/${PATIENT}.tmp.recode.vcf \
+  --vcf ${WORKDIR}/${PATIENT}.tmp.recode.vcf \
 	--exclude-bed ${WORKDIR}/${PATIENT}_carcinoma.cn.bed \
 	--out ${WORKDIR}/${PATIENT}.diploid \
 	--recode
+
 rm ${WORKDIR}/${PATIENT}.tmp.recode.vcf
 mv ${WORKDIR}/${PATIENT}.diploid.recode.vcf ${WORKDIR}/${PATIENT}.diploid.vcf
 
 
 # Remove indels
 
+module load gatk/4.1.1.0
 
-awk '
-{split($0,a,"");
-if(a[1]=="#"){
-	print $0}
-else{
-	if(length($4)==1 && length($5)==1){
-		print $0}}}
-' ${WORKDIR}/${PATIENT}.diploid.vcf > ${WORKDIR}/${PATIENT}.diploid.snvs.vcf
+gatk SelectVariants \
+        -V ${WORKDIR}/${PATIENT}.diploid.vcf \
+        -R ${RESDIR}/hg19.fasta \
+         --select-type-to-include SNP \
+        -O ${WORKDIR}/${PATIENT}.diploid.snvs.vcf
+
 
 
 # Get list of positions to recover read counts
@@ -126,7 +126,7 @@ grep -v '^#' ${WORKDIR}/${PATIENT}.diploid.snvs.vcf | awk '{print $1"\t"$2-1"\t"
 
 # Recover read counts
 
-module load gatk/4.1.1.0
+
 
 gatk CollectAllelicCounts \
           -I ${ORIDIR}/bams_wes/${PATIENT}Adenoma_recalibrated.bam \
@@ -143,30 +143,26 @@ gatk CollectAllelicCounts \
 
 # Merge adenoma and carcinoma read counts
 
+
 for TUMOR in $tumors; do
 
 grep -v '^@' ${WORKDIR}/${PATIENT}_${TUMOR}.allelicCounts.tsv | sed "s/COUNT/COUNT_$TUMOR/g" | awk '{print $1":"$2"\t"$3"\t"$4"\t"$5"\t"$6 }' > ${WORKDIR}/${PATIENT}_${TUMOR}.Counts.tsv
 
 done
 
-join ${WORKDIR}/${PATIENT}_adenoma.Counts.tsv ${WORKDIR}/${PATIENT}_carcinoma.Counts.tsv > ${WORKDIR}/${PATIENT}.Counts 
+join ${WORKDIR}/${PATIENT}_adenoma.Counts.tsv ${WORKDIR}/${PATIENT}_carcinoma.Counts.tsv > ${WORKDIR}/${PATIENT}.Counts
 
-# Convert to LICHeE input format
 
-awk -F " " '
-BEGIN{print "#chr\tposition\tdescription\tNormal\tAdenoma\tCarcinoma"}
-{if(NR==1){next}
-if($5!=$9){
-	if($5!="N" && $9!="N"){
-		next}
-	else{
-		if($5!="N"){
-			alt=$5}
-		else{
-			alt=$9}}}
-else{alt=$5}
-split($1,a,":");
-print a[1]"\t"a[2]"\t"$4"/"$5"\t0.0\t"$3/($2+$3)"\t"$7/($6+$7)
+# Convert to LICHeE and CloneFinder input format
 
-}' ${WORKDIR}/${PATIENT}.Counts > ${WORKDIR}/${PATIENT}.LicheeInput
+module load gcccore/6.4.0 python/2.7.15
 
+python CreateCDInput_targeted.py \
+	--input ${WORKDIR}/${PATIENT}.Counts \
+	--lichee ${WORKDIR}/${PATIENT}.NewLicheeInput \
+	--cloneFinder ${WORKDIR}/${PATIENT}.CloneFinderInput \
+	--healthy "$HEALTHY" \
+	--maxVafIfNotHealthy 0.9 \
+	--minDepth 20 \
+	--minVaf 0.05 \
+	--germlineVaf 0.1

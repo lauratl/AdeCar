@@ -17,7 +17,7 @@ PATIENTS=`cut -f2 ${SAMPLELIST} | sort | uniq | awk '{printf $0" "}'`
 
 PATIENTS="AC1 AC6 AC30"
 
-# Run the rest of the script for each patient 
+# Run the rest of the script for each patient
 
 echo "Starting Lichee input creation" > $LOG
 echo "#patient;healthy;initial_variants;non-diploid-genes;diploidvariants;snvs;retrieved;enoughdepth;somatic;final" > $TABLE
@@ -41,7 +41,7 @@ echo "Healthy sample is $HEALTHY" >>$LOG
 
 ## Combine vcfs
 
-module load gatk/3.7-0-gcfedb67 
+module load gatk/3.7-0-gcfedb67
 
 SAMPLES_TO_COMBINE=`echo $SAMPLES | sed 's/ /\n/g' | awk -v workdir=$ORIDIR/variants_targeted/${PATIENT} '{split("abcdefghijklmnopqrstu",foosamplenames,"");printf "-V:"foosamplenames[NR]" "workdir"/"$1".vcf "}'`
 ROD_PRIORITY_LIST=`echo $SAMPLES | sed 's/ /\n/g' | awk -v workdir=$ORIDIR/variants_targeted/${PATIENT} '{split("abcdefghijklmnopqrstu",foosamplenames,"");printf foosamplenames[NR]","}' | awk -F "" '{for(i=1;i<NF;i++){printf $i}}' `
@@ -63,7 +63,7 @@ echo "Initial variants: $INITIAL" >> $LOG
 
 ## Extract non-diploid genes for that patient
 
-GENES=`grep ";$PATIENT;" ${ORIDIR}/cn_targeted/targeted_cn.csv | cut -d ";" -f1 | awk '{printf $1" "}'` 
+GENES=`grep ";$PATIENT;" ${ORIDIR}/cn_targeted/targeted_cn.csv | cut -d ";" -f1 | awk '{printf $1" "}'`
 
 ## Create bed file of the non-diploid regions from the genes
 
@@ -71,7 +71,7 @@ CNFILE=${WORKDIR}/${PATIENT}.cn.bed
 
 if [ -f ${CNFILE} ]; then echo "Existing file removed"; rm $CNFILE; fi
 
-awk 'BEGIN{print "chromosome\tstart\tend"}' > $CNFILE 
+awk 'BEGIN{print "chromosome\tstart\tend"}' > $CNFILE
 
 for GENE in $GENES; do
 grep $GENE ${ORIDIR}/cn_targeted/design.bed | cut -f1,2,3  >> $CNFILE
@@ -114,7 +114,7 @@ echo "Diploid SNVs: $SNVS" >> $LOG
 
 # If no healthy sample, remove variants in dbSNP
 
-if [ "$HEALTHY" == "" ]; then 
+if [ "$HEALTHY" == "" ]; then
 
 
 gatk SelectVariants \
@@ -176,7 +176,7 @@ if [ $SAMPLE == ${SAMPLESARRAY[0]} ]; then
 echo ""
 
 elif [ $SAMPLE == ${SAMPLESARRAY[1]} ]; then
-join ${WORKDIR}/${PATIENT}.${SAMPLESARRAY[0]}.Counts.tsv ${WORKDIR}/${PATIENT}.${SAMPLE}.Counts.tsv > ${WORKDIR}/${PATIENT}.tmp.${SAMPLE}.Counts 
+join ${WORKDIR}/${PATIENT}.${SAMPLESARRAY[0]}.Counts.tsv ${WORKDIR}/${PATIENT}.${SAMPLE}.Counts.tsv > ${WORKDIR}/${PATIENT}.tmp.${SAMPLE}.Counts
 PREVSAMPLE=${SAMPLE}
 
 else
@@ -194,11 +194,19 @@ RETRIEVED=$(grep -v '^CONTIG' ${WORKDIR}/${PATIENT}.Counts | wc -l)
 echo "Retrieved read counts from  $RETRIEVED variants" >> $LOG
 
 
-# Convert to LICHeE input format
+# Convert to LICHeE and CloneFinder input format
 
 module load gcccore/6.4.0 python/2.7.15
 
-python CreateCDInput_targeted.py ${WORKDIR}/${PATIENT}.Counts ${WORKDIR}/${PATIENT}.LicheeInput ${WORKDIR}/${PATIENT}.CloneFinderInput $HEALTHY
+python CreateCDInput_targeted.py \
+	--input ${WORKDIR}/${PATIENT}.Counts \
+	--lichee ${WORKDIR}/${PATIENT}.LicheeInput \
+	--cloneFinder ${WORKDIR}/${PATIENT}.CloneFinderInput \
+	--healthy "$HEALTHY" \
+	--maxVafIfNotHealthy 0.9 \
+	--minDepth 20 \
+	--minVaf 0.04 \
+	--germlineVaf 0.1
 
 
 
