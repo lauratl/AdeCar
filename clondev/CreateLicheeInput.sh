@@ -159,7 +159,7 @@ module load gcccore/6.4.0 python/2.7.15
 
 python CreateCDInput_targeted.py \
 	--input ${WORKDIR}/${PATIENT}.Counts \
-	--lichee ${WORKDIR}/${PATIENT}.NewLicheeInput \
+	--lichee ${WORKDIR}/${PATIENT}.LicheeInput \
 	--cloneFinder ${WORKDIR}/${PATIENT}.CloneFinderInput \
 	--healthy "$HEALTHY" \
 	--maxVafIfNotHealthy 0.9 \

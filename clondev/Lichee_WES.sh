@@ -33,7 +33,7 @@ LICHEE=/mnt/netapp1/posadalab/APPS/lichee/LICHeE/release/
 
 cd $LICHEE
 ./lichee -build \
-	-i ${WORKDIR}/prepare_clonefinder_input/from_bams/${PATIENT}.LicheeInput \
+	-i ${WORKDIR}/prepare_clonefinder_input/from_bams/with_python/${PATIENT}.LicheeInput \
 	-minVAFPresent 0.05 \
 	-maxVAFAbsent 0.025 \
 	-maxVAFValid 0.6 \

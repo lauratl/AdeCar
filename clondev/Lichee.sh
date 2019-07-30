@@ -33,8 +33,8 @@ LICHEE=/mnt/netapp1/posadalab/APPS/lichee/LICHeE/release/
 cd $LICHEE
 ./lichee -build \
 	-i ${WORKDIR}/prepare_lichee_input/${PATIENT}.LicheeInput \
-	-maxVAFAbsent 0.05 \
-	-minVAFPresent 0.1 \
+	-maxVAFAbsent 0.04 \
+	-minVAFPresent 0.04 \
 	-n 0 \
 	-o ${WORKDIR}/lichee/${PATIENT}.Lichee \
 	-v \
