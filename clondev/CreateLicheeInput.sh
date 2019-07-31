@@ -132,13 +132,29 @@ gatk CollectAllelicCounts \
           -I ${ORIDIR}/bams_wes/${PATIENT}Adenoma_recalibrated.bam \
           -R ${RESDIR}/hs37d5.fa \
           -L ${WORKDIR}/${PATIENT}.pos.bed \
-          -O ${WORKDIR}/${PATIENT}_adenoma.allelicCounts.tsv
+          -O ${WORKDIR}/${PATIENT}_adenoma.allelicCounts.tsv \
+		  --read-filter MappingQualityAvailableReadFilter \
+		  --read-filter MappingQualityNotZeroReadFilter \
+  		  --read-filter NotSecondaryAlignmentReadFilter \
+		  --read-filter PassesVendorQualityCheckReadFilter \
+		  --read-filter NonChimericOriginalAlignmentReadFilter \
+		  --read-filter ReadLengthReadFilter --max-read-length 100000 --min-read-length 30 \
+		  --read-filter GoodCigarReadFilter 
+
+
 
 gatk CollectAllelicCounts \
           -I ${ORIDIR}/bams_wes/${PATIENT}Carcinoma_recalibrated.bam \
           -R ${RESDIR}/hs37d5.fa \
           -L ${WORKDIR}/${PATIENT}.pos.bed \
-          -O ${WORKDIR}/${PATIENT}_carcinoma.allelicCounts.tsv
+          -O ${WORKDIR}/${PATIENT}_carcinoma.allelicCounts.tsv \
+		  --read-filter MappingQualityAvailableReadFilter \
+		  --read-filter MappingQualityNotZeroReadFilter \
+  		  --read-filter NotSecondaryAlignmentReadFilter \
+		  --read-filter PassesVendorQualityCheckReadFilter \
+		  --read-filter NonChimericOriginalAlignmentReadFilter \
+		  --read-filter ReadLengthReadFilter --max-read-length 100000 --min-read-length 30 \
+		  --read-filter GoodCigarReadFilter 
 
 
 # Merge adenoma and carcinoma read counts
