@@ -214,7 +214,8 @@ def isPanelError(mut):
                     'chr21' : ["326385",
                                "32638549",
                                "32638550"],
-                    'chr8'  : ["13356818"] }
+                    'chr8'  : ["13356818"],
+                    'chr10' : ["88651913"] }
 
     chrom = muts[mut]['chr']
     pos = muts[mut]['pos']
