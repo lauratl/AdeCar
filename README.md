@@ -1,2 +1,2 @@
 # AdeCar
-Adenoma - Carcinoma project
+Adenoma - Carcinoma project (Mamlouk et al.)
